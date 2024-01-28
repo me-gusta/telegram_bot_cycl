@@ -33,7 +33,7 @@ export const get_now_timestamp = () => {
 }
 
 export const time_in_day = (60 * 60 * 24)
-export const weekdays = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс']
+export const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
 export const months = { 'янв': 31, 'фев': 29, 'март': 31, 'апр': 30, 'май': 31, 'июн': 30, 'июл': 31, 'авг': 31, 'сен': 30, 'окт': 31, 'ноя': 30, 'дек': 31 }
 
 const get_finite = (cycl) => {

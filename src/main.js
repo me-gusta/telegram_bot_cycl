@@ -136,7 +136,7 @@ bot.on(message('text'), async (ctx) => {
 
     const text = ctx.message.text
 
-    const tasks = await make_today()
+    const tasks = await make_day(get_now_timestamp())
 
     if (text.startsWith('..') || text.startsWith('.')) {
         // repeat
