@@ -3,19 +3,11 @@ import { message } from 'telegraf/filters'
 import { Agenda } from '@hokify/agenda';
 import { log } from 'console';
 import dotenv from 'dotenv'
-import * as fs from 'fs';
-import { shuffleArray, sleep, get_schedule } from './util.js';
-import { MongoClient } from 'mongodb';
+import { shuffleArray, sleep, get_schedule, get_now_timestamp, time_in_day } from './util.js';
+import moment from 'moment';
+import { db } from './database.js';
+import { make_day, pretty_print_interval, pretty_print_day } from './tasks.js';
 
-const mongo = new MongoClient('mongodb://127.0.0.1')
-
-let db
-
-(async function () {
-    await mongo.connect();
-    log('started mongodb');
-    db = mongo.db('telegram_bot_cycl').collection('schedules')
-})();
 
 dotenv.config()
 
@@ -25,43 +17,14 @@ const agenda = new Agenda({ db: { address: 'mongodb://127.0.0.1/telegram_bot_cyc
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 
-const kopt = { columns: 1 }
-
-const MAX_LESSONS = 3
 
 const MODERATOR_ID = Number(process.env.MODERATOR_ID)
-const SUBSCRIBE_CHAT_ID = process.env.SUBSCRIBE_CHAT_ID
 
 
 agenda.define(
-    'send_lesson',
+    'notify',
     async job => {
-        const { lesson_id, chat_id } = job.attrs.data;
-        const text = 'Урок #' + lesson_id
-
-        const btns = [
-            Markup.button.callback('Купить полную версию', '/form/1'),
-        ]
-        if (lesson_id < MAX_LESSONS) {
-            btns.push(
-                Markup.button.callback('Смотреть урок ' + (lesson_id + 1), '/request/' + (lesson_id + 1))
-            )
-        }
-
-        const markup = Markup.inlineKeyboard(btns, kopt)
-
-        try {
-            await bot.telegram.sendVideo(chat_id, lesson_videos[lesson_id])
-
-            await bot.telegram.sendMessage(chat_id, text, markup)
-            log('GOOD  send_lesson', chat_id)
-        } catch (e) {
-            log('-------------------')
-            log('ERROR send_lesson', chat_id)
-            log(e)
-
-            log('-------------------')
-        }
+        await send_today()
     },
     { priority: 'high', concurrency: 10 }
 );
@@ -69,6 +32,15 @@ agenda.define(
 (async function () {
     await agenda.start();
     log('started agenda');
+    // await agenda.schedule('in 5 seconds', 'notify')
+    const event = agenda.create('notify', {
+        skipImmediate: true
+    });
+    const time = moment()
+    time.set({ hours: 9, minutes: 0, seconds: 0, milliseconds: 0 })
+    event.schedule(time);
+
+    await event.repeatAt('1 day').save();
 })();
 
 
@@ -108,103 +80,10 @@ const get_user = (ctx) => {
     return user
 }
 
-const get_msg = () => {
-    const list = [
-        'покормить кота',
-        'навести порядок в доме',
-        'создать машину',
-        'купить чайник',
-        'пойти в подземелье Дракона и завоевать Принцессу',
-        'Уничтожить мышь, убидь желудиное логов, сжечь бесов в пламени любви',
-        'купить компьютерный прибор',
-    ]
 
-    shuffleArray(list)
-
-    return list.map((e, i) => `${i + 1}. ${e}`).join('\n')
-}
-
-const update_schedule = async () => {
-    const all = await db.find({ is_removed: { $exists: false } }).toArray()
-}
-
-const make_today = async () => {
-    const all = await db.find({ is_removed: { $exists: false } }).toArray()
-    const out = []
-
-    const now = new Date()
-
-    for (let obj of all) {
-        const date = new Date(obj.date.getTime())
-        date.setHours(0)
-        date.setMinutes(0)
-        date.setSeconds(1)
-        date.setMilliseconds(0)
-        const delta = now - date
-        const days = Math.floor(delta / (1000 * 60 * 60 * 24))
-
-        switch (obj.type) {
-            case 'offset': {
-                let is_good = days % obj.value === 0
-                if (obj.type === 'once') {
-                    is_good = is_good && days / obj.value == 1
-                }
-                if (is_good) {
-                    out.push(obj)
-                }
-                break
-            }
-            case 'weekday': {
-                const is_good = now.getDay() === obj.value
-                if (obj.type === 'once') {
-                    is_good = is_good && days <= 7 && days > 0
-                }
-
-                if (is_good) {
-                    out.push(obj)
-                }
-                break
-            }
-            case 'monthday': {
-                const is_good = now.getDate() === obj.value
-                if (is_good) {
-                    out.push(obj)
-                }
-                break
-            }
-            case 'specific': {
-                const is_good = now.getDate() === obj.value.getDate() && now.getMonth() === obj.value.getMonth()
-                if (is_good) {
-                    out.push(obj)
-                }
-                break
-            }
-        }
-    }
-    out.sort((a, b) => {
-        const get_time = (time_str) => {
-            const split = time_str.split(':')
-            const h = Number(split[0])
-            const m = Number(split[1])
-            return h * 60 + m
-        }
-        const a_time = a.time === undefined ? 0 : get_time(a.time)
-        const b_time = b.time === undefined ? 0 : get_time(b.time)
-        return a_time - b_time
-    })
-    return out
-}
-
-const format_obj = (obj, i) => {
-    const time = obj.time ? obj.time + ' ' : ''
-    const is_checked = obj.is_checked ? '✅ ' : ''
-    return (i + 1) + '. ' + is_checked + time + obj.text
-}
-
-const send_schedule = async (ctx) => {
-    const objs = await make_today()
-    const msg = '🥇 *Квесты на сегодня*' + '\n\n' + objs.map(format_obj).join('\n')
-    await bot.telegram.sendMessage(ctx.chat.id, {
+const send_today = async (ctx) => {
+    const msg = '🥇 *Квесты на сегодня*' + '\n\n' + await pretty_print_day(get_now_timestamp())
+    await bot.telegram.sendMessage(MODERATOR_ID, {
         text: msg,
         parse_mode: 'markdown'
     })
@@ -215,7 +94,41 @@ bot.start(async (ctx) => {
     user.location = '/'
 
     // await sleep(5000)
-    await send_schedule(ctx)
+    await send_today(ctx)
+})
+
+bot.command('notify', async (ctx) => {
+    await sleep(5000)
+    await send_today(ctx)
+})
+
+bot.command('all', async (ctx) => {
+    // сначала подробно неделя - таски что повторяются и точные (9 дней)
+    // потом таски что в неделю не вмещаются, но будут потом
+    const text = await pretty_print_interval()
+    await bot.telegram.sendMessage(ctx.chat.id, {
+        text,
+        parse_mode: 'markdown'
+    })
+})
+
+
+bot.command('past', async (ctx) => {
+    const args = ctx.message.text.split(' ')
+    let day_n = 1
+    if (args.length > 1) {
+        day_n = Number(args[1])
+    }
+
+    if (isNaN(day_n) || day_n < 1) return
+
+    const poza = 'поза'.repeat(day_n - 1)
+
+    const msg = `*Что было ${poza}вчера*` + '\n\n' + await pretty_print_day(get_now_timestamp() - (time_in_day * day_n))
+    await bot.telegram.sendMessage(ctx.chat.id, {
+        text: msg,
+        parse_mode: 'markdown'
+    })
 })
 
 bot.on(message('text'), async (ctx) => {
@@ -223,36 +136,33 @@ bot.on(message('text'), async (ctx) => {
 
     const text = ctx.message.text
 
-    const objs = await make_today()
+    const tasks = await make_today()
 
     if (text.startsWith('..') || text.startsWith('.')) {
         // repeat
         // once
-        const schedule = {
-            ...get_schedule(text),
-            date: new Date()
-        }
-        console.log(schedule);
+        const schedule = get_schedule(text)
         await db.insertOne(schedule)
     } else if (text.startsWith('в ') || text.startsWith('v ')) {
         // check as done
-        const items = text.replace('в ', '').replace('v ', '').split(' ').map(x => Number(x))
-        for (let item of items) {
-            let obj = objs[item - 1]
-            if (!obj) continue
-            await db.updateOne({ _id: obj._id }, { $set: { is_checked: !Boolean(obj.is_checked) } })
+        const checkmarks = text.replace('в ', '').replace('v ', '').split(' ').map(x => Number(x))
+
+        for (let checkmark of checkmarks) {
+            let task = tasks[checkmark - 1]
+            if (!task) continue
+            await db.updateOne({ _id: task._id }, { $set: { is_checked: !Boolean(task.is_checked) } })
         }
-        await send_schedule(ctx)
     } else if (text.startsWith('у ') || text.startsWith('y ')) {
         // remove
         // check as done
         const items = text.replace('у ', '').replace('y ', '').split(' ').map(x => Number(x))
         for (let item of items) {
-            let obj = objs[item - 1]
+            let obj = tasks[item - 1]
             if (!obj) continue
             await db.updateOne({ _id: obj._id }, { $set: { is_removed: true } })
         }
     }
+    await send_today(ctx)
 
 })
 
