@@ -32,7 +32,7 @@ const sort_tasks = (tasks) => {
 
 export const string_for_day = (timestamp, tasks) => {
     const date = moment.unix(Number(timestamp))
-    const weekday = weekdays[date.day()]
+    const weekday = weekdays[date.day()-1]
     const monthday = date.date()
     const month = Object.keys(months)[date.month()]
 
