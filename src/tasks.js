@@ -9,10 +9,14 @@ const emoji_number= (number) => {
     return emojies[number]
 }
 
-const format_task = (obj, i) => {
-    const time = obj.time ? obj.time + ' ' : ''
-    const is_checked = obj.is_checked ? '✅' : emoji_number(i + 1)
-    return  is_checked + ' ' + time + obj.text
+const format_task = (timestamp) => {
+    const can_check = timestamp === get_now_timestamp()
+
+    return (obj, i) => {
+        const time = obj.time ? obj.time + ' ' : ''
+        const is_checked = can_check && obj.is_checked ? '✅' : emoji_number(i + 1)
+        return  is_checked + ' ' + time + obj.text
+    }
 }
 
 const sort_tasks = (tasks) => {
@@ -41,7 +45,7 @@ export const string_for_day = (timestamp, tasks) => {
 
     sort_tasks(tasks)
 
-    text += tasks.map(format_task).join('\n')
+    text += tasks.map(format_task(timestamp)).join('\n')
 
     return text
 }
@@ -109,18 +113,37 @@ const make_interval = async () => {
 
 
         }
-        if (out[target_timestamp].length === 0)
-            delete out[target_timestamp]
+        // if (out[target_timestamp].length === 0)
+        //     delete out[target_timestamp]
     }
     return out
+}
+
+const spell_day = (amount) => {
+    if (amount === 1) {
+        return 'день'
+    } else if (amount === 2 || amount === 3 || amount === 4) {
+        return 'дня'
+    }  else {
+        return 'дней'
+    }
 }
 
 export const pretty_print_interval = async () => {
     const interval = await make_interval()
     let texts = []
 
+    let empty_days = 0
     for (let [timestamp, tasks] of Object.entries(interval)) {
-        texts.push(string_for_day(timestamp, tasks))
+        if (tasks.length) {
+            if (empty_days > 0) {
+                texts.push('.'.repeat(20) + ` _${empty_days} ${spell_day(empty_days)}_`)
+                empty_days = 0
+            }
+            texts.push(string_for_day(timestamp, tasks))
+        } else {
+            empty_days++
+        }
     }
     texts.reverse()
     return texts.join('\n\n')
