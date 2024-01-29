@@ -134,7 +134,7 @@ bot.command('past', async (ctx) => {
 bot.on(message('text'), async (ctx) => {
     const user = get_user(ctx)
 
-    const text = ctx.message.text
+    const text = ctx.message.text.toLowerCase()
 
     const tasks = await make_day(get_now_timestamp())
 
