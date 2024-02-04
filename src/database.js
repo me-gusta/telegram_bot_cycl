@@ -8,4 +8,5 @@ export let db
     await mongo.connect();
     console.log('started mongodb')
     db = mongo.db('telegram_bot_cycl').collection('schedules')
+    mongo.db('telegram_bot_cycl').collection('agendaJobs').deleteMany({})
 })();
