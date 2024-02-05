@@ -37,7 +37,6 @@ const sort_tasks = (tasks) => {
 export const string_for_day = (timestamp, tasks) => {
     const date = moment.unix(Number(timestamp))
     const weekday = weekdays[date.day()]
-    console.log(date, weekday, date.day());
     const monthday = date.date()
     const month = Object.keys(months)[date.month()]
 
@@ -71,7 +70,7 @@ const is_task_for_day = (task, target_timestamp) => {
                 is_good = date.day() === task.weekday
                 break
             }
-            case _: {
+            default: {
                 is_good = false
                 break
             }
@@ -110,8 +109,6 @@ const make_interval = async () => {
                     task.added = true
                 }
             }
-
-
         }
         // if (out[target_timestamp].length === 0)
         //     delete out[target_timestamp]
@@ -156,6 +153,18 @@ export const make_day = async (timestamp) => {
     for (let task of tasks) {
         const is_good = is_task_for_day(task, timestamp)
         if (!is_good) continue
+
+        const data = {
+            mark: true,
+            date: get_now_timestamp(),
+            for_task: task._id
+        }
+        const checkmark = await db.findOne(data)
+
+        if (checkmark)
+            task.is_checked = true
+        else
+            task.is_checked = false
 
         out.push(task)
     }

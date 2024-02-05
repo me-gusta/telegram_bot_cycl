@@ -36,8 +36,12 @@ agenda.define(
     const event = agenda.create('notify', {
         skipImmediate: true
     });
-    const time = moment()
+    let time = moment()
+    if (time.hours()>= 9)
+        time = time.add(1, 'days')
     time.set({ hours: 9, minutes: 0, seconds: 0, milliseconds: 0 })
+
+    console.log(time);
     event.schedule(time);
 
     await event.repeatAt('1 day').save();
@@ -147,10 +151,20 @@ bot.on(message('text'), async (ctx) => {
         // check as done
         const checkmarks = text.replace('в ', '').replace('v ', '').split(' ').map(x => Number(x))
 
-        for (let checkmark of checkmarks) {
-            let task = tasks[checkmark - 1]
+        for (let mark of checkmarks) {
+            let task = tasks[mark - 1]
             if (!task) continue
-            await db.updateOne({ _id: task._id }, { $set: { is_checked: !Boolean(task.is_checked) } })
+            const data = {
+                mark: true,
+                date: get_now_timestamp(),
+                for_task: task._id
+            }
+            const checkmark = await db.findOne(data)
+            if (checkmark) {
+                await db.deleteOne(checkmark)
+            } else {
+                await db.insertOne(data)
+            }
         }
     } else if (text.startsWith('у ') || text.startsWith('y ')) {
         // remove
