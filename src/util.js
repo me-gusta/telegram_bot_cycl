@@ -49,7 +49,7 @@ const get_finite = (cycl) => {
     if (weekdays.indexOf(cycl) !== -1) {
         // в следующий день недели "cycl"
 
-        const weekday = weekdays.indexOf(cycl) + 1
+        const weekday = weekdays.indexOf(cycl)
 
         for (let i = 1; i < 8; i++) {
             const target_time = now + i * time_in_day
@@ -153,13 +153,15 @@ export const get_schedule = (init_str) => {
 
     if (!cycl) return undefined
 
-
+    console.log('cycl', cycl)
     let type
-    if (dots.length == 1) {
+    if (dots.length === 1) {
         type = get_finite(cycl)
     } else {
         type = get_repeat(cycl)
     }
+
+    console.log('type', type)
 
     if (!type) return undefined
 

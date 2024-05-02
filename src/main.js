@@ -1,32 +1,31 @@
-import { Telegraf, Markup } from 'telegraf'
-import { message } from 'telegraf/filters'
-import { Agenda } from '@hokify/agenda';
-import { log } from 'console';
+import {Telegraf, Markup} from 'telegraf'
+import {message} from 'telegraf/filters'
+import {Agenda} from '@hokify/agenda';
+import {log} from 'console';
 import dotenv from 'dotenv'
-import { shuffleArray, sleep, get_schedule, get_now_timestamp, time_in_day } from './util.js';
+import {shuffleArray, sleep, get_schedule, get_now_timestamp, time_in_day} from './util.js';
 import moment from 'moment';
-import { db } from './database.js';
-import { make_day, pretty_print_interval, pretty_print_day } from './tasks.js';
+import {db} from './database.js';
+import {make_day, pretty_print_interval, pretty_print_day} from './tasks.js';
 
 
 dotenv.config()
 
 
-console.log();
-const agenda = new Agenda({ db: { address: 'mongodb://127.0.0.1/telegram_bot_cycl' } });
+const agenda = new Agenda({db: {address: 'mongodb://127.0.0.1/telegram_bot_cycl'}});
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 
-
 const MODERATOR_ID = Number(process.env.MODERATOR_ID)
 
+let last_inserted_id = undefined
 
 agenda.define(
     'notify',
     async job => {
         await send_today()
     },
-    { priority: 'high', concurrency: 10 }
+    {priority: 'high', concurrency: 10}
 );
 
 (async function () {
@@ -37,9 +36,9 @@ agenda.define(
         skipImmediate: true
     });
     let time = moment()
-    if (time.hours()>= 9)
+    if (time.hours() >= 9)
         time = time.add(1, 'days')
-    time.set({ hours: 9, minutes: 0, seconds: 0, milliseconds: 0 })
+    time.set({hours: 9, minutes: 0, seconds: 0, milliseconds: 0})
 
     console.log(time);
     event.schedule(time);
@@ -106,10 +105,48 @@ bot.command('notify', async (ctx) => {
     await send_today(ctx)
 })
 
+bot.command('cancel', async (ctx) => {
+    if (! last_inserted_id)
+        return
+    await db.deleteOne({_id: last_inserted_id})
+    await bot.telegram.sendMessage(MODERATOR_ID, {
+        text: 'Действие отменено',
+        parse_mode: 'markdown'
+    })
+
+    await send_today(ctx)
+})
+
 bot.command('all', async (ctx) => {
     // сначала подробно неделя - таски что повторяются и точные (9 дней)
     // потом таски что в неделю не вмещаются, но будут потом
     const text = await pretty_print_interval()
+    await bot.telegram.sendMessage(ctx.chat.id, {
+        text,
+        parse_mode: 'markdown'
+    })
+})
+
+
+bot.command('help', async (ctx) => {
+    const text = `**Помощь**
+    /all - всё расписание
+    /start - расписание на сегодня
+    /past [n:int:optional] - расписание n дней назад
+    /cancel - удалить последнее добавленное задание
+    /notify - через 5 секунд прислать уведомление с расписание на сегодня
+    
+    **Синтаксис**
+    Новое задание
+    .6 - задание через N дней
+    .пн - задание в N день недели
+    .5авг - задание в N день
+    
+    Новое повторяющееся задание
+    ..6 - каждые N дней
+    ..пн - каждый N день недели
+    ..15ч - N числа каждого месяца
+    `
     await bot.telegram.sendMessage(ctx.chat.id, {
         text,
         parse_mode: 'markdown'
@@ -146,7 +183,8 @@ bot.on(message('text'), async (ctx) => {
         // repeat
         // once
         const schedule = get_schedule(text)
-        await db.insertOne(schedule)
+        const response = await db.insertOne(schedule)
+        last_inserted_id = response.insertedId
     } else if (text.startsWith('в ') || text.startsWith('v ')) {
         // check as done
         const checkmarks = text.replace('в ', '').replace('v ', '').split(' ').map(x => Number(x))
@@ -173,13 +211,12 @@ bot.on(message('text'), async (ctx) => {
         for (let item of items) {
             let obj = tasks[item - 1]
             if (!obj) continue
-            await db.updateOne({ _id: obj._id }, { $set: { is_removed: true } })
+            await db.updateOne({_id: obj._id}, {$set: {is_removed: true}})
         }
     }
     await send_today(ctx)
 
 })
-
 
 
 bot.catch(error => console.error(error))
