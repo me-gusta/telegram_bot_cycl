@@ -106,7 +106,7 @@ bot.command('notify', async (ctx) => {
 })
 
 bot.command('cancel', async (ctx) => {
-    if (! last_inserted_id)
+    if (!last_inserted_id)
         return
     await db.deleteOne({_id: last_inserted_id})
     await bot.telegram.sendMessage(MODERATOR_ID, {
@@ -120,7 +120,7 @@ bot.command('cancel', async (ctx) => {
 bot.command('all', async (ctx) => {
     // сначала подробно неделя - таски что повторяются и точные (9 дней)
     // потом таски что в неделю не вмещаются, но будут потом
-    const text = await pretty_print_interval()
+    const text = await pretty_print_interval() || 'Нет задач'
     await bot.telegram.sendMessage(ctx.chat.id, {
         text,
         parse_mode: 'markdown'
