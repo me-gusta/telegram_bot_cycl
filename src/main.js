@@ -23,6 +23,10 @@ let last_inserted_id = undefined
 agenda.define(
     'notify',
     async job => {
+        const tasks = await make_day(get_now_timestamp())
+        console.log('tasks:', tasks)
+        if (tasks.length === 0) return
+
         await send_today()
     },
     {priority: 'high', concurrency: 10}
