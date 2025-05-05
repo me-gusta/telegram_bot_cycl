@@ -1,18 +1,12 @@
 import {Telegraf, Markup} from 'telegraf'
 import {message} from 'telegraf/filters'
-import {Agenda} from '@hokify/agenda';
-import {log} from 'console';
 import dotenv from 'dotenv'
-import {shuffleArray, sleep, get_schedule, get_now_timestamp, time_in_day} from './util.js';
-import moment from 'moment';
+import {sleep, get_schedule, get_now_timestamp, time_in_day} from './util.js';
 import {db} from './database.js';
 import {make_day, pretty_print_interval, pretty_print_day} from './tasks.js';
 
 
 dotenv.config()
-
-
-const agenda = new Agenda({db: {address: 'mongodb://127.0.0.1/telegram_bot_cycl'}});
 
 const bot = new Telegraf(process.env.BOT_TOKEN)
 
@@ -20,35 +14,49 @@ const MODERATOR_ID = Number(process.env.MODERATOR_ID)
 
 let last_inserted_id = undefined
 
-agenda.define(
-    'notify',
-    async job => {
-        const tasks = await make_day(get_now_timestamp())
-        console.log('tasks:', tasks)
-        if (tasks.length === 0) return
+// // Simple scheduler to send daily notifications at 9:00 AM
+// const scheduleNotification = () => {
+//     const scheduleDaily = () => {
+//         const now = new Date();
+//         let nextNotification = new Date();
+        
+//         // Set to 9:00 AM
+//         nextNotification.setHours(9, 0, 0, 0);
+        
+//         // If it's already past 9 AM, schedule for tomorrow
+//         if (now > nextNotification) {
+//             nextNotification.setDate(nextNotification.getDate() + 1);
+//         }
+        
+//         // Time until next notification in ms
+//         const timeUntilNotification = nextNotification - now;
+        
+//         console.log(`Next notification scheduled for ${nextNotification}`);
+        
+//         // Schedule the notification
+//         setTimeout(async () => {
+//             // Send the notification
+//             try {
+//                 const tasks = await make_day(get_now_timestamp());
+//                 console.log('tasks:', tasks);
+//                 if (tasks.length > 0) {
+//                     await send_today();
+//                 }
+//             } catch (error) {
+//                 console.error('Error sending notification:', error);
+//             }
+            
+//             // Schedule the next day's notification
+//             scheduleDaily();
+//         }, timeUntilNotification);
+//     };
+    
+//     // Start the scheduling
+//     scheduleDaily();
+// };
 
-        await send_today()
-    },
-    {priority: 'high', concurrency: 10}
-);
-
-(async function () {
-    await agenda.start();
-    log('started agenda');
-    // await agenda.schedule('in 5 seconds', 'notify')
-    const event = agenda.create('notify', {
-        skipImmediate: true
-    });
-    let time = moment()
-    if (time.hours() >= 9)
-        time = time.add(1, 'days')
-    time.set({hours: 9, minutes: 0, seconds: 0, milliseconds: 0})
-
-    console.log(time);
-    event.schedule(time);
-
-    await event.repeatAt('1 day').save();
-})();
+// // Start the notification scheduler
+// scheduleNotification();
 
 
 bot.use(async (ctx, next) => {
