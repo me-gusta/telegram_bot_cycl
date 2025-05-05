@@ -1,7 +1,7 @@
-import moment from "moment"
+const moment = require("moment");
 
-export const sleep = ms => new Promise(r => setTimeout(r, ms))
-export function shuffleArray(array) {
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
@@ -26,15 +26,15 @@ const is_time = (time_str) => {
 }
 
 
-export const get_now_timestamp = () => {
+const get_now_timestamp = () => {
     const date = moment()
     date.set({ hour: 0, minute: 0, second: 0, millisecond: 0 })
     return date.unix()
 }
 
-export const time_in_day = (60 * 60 * 24)
-export const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
-export const months = { 'янв': 31, 'фев': 29, 'март': 31, 'апр': 30, 'май': 31, 'июн': 30, 'июл': 31, 'авг': 31, 'сен': 30, 'окт': 31, 'ноя': 30, 'дек': 31 }
+const time_in_day = (60 * 60 * 24)
+const weekdays = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
+const months = { 'янв': 31, 'фев': 29, 'март': 31, 'апр': 30, 'май': 31, 'июн': 30, 'июл': 31, 'авг': 31, 'сен': 30, 'окт': 31, 'ноя': 30, 'дек': 31 }
 
 const get_finite = (cycl) => {
 
@@ -146,7 +146,7 @@ const get_text = (split) => {
     return data
 }
 
-export const get_schedule = (init_str) => {
+const get_schedule = (init_str) => {
     const split = init_str.split(' ')
     const dots = split[0].split('').filter(x => x == '.')
     const cycl = split[0].replaceAll('.', '')
@@ -170,3 +170,13 @@ export const get_schedule = (init_str) => {
         ...get_text(split)
     }
 }
+
+module.exports = {
+    sleep,
+    shuffleArray,
+    get_now_timestamp,
+    time_in_day,
+    weekdays,
+    months,
+    get_schedule
+};

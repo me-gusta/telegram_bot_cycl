@@ -1,6 +1,6 @@
-import moment from "moment"
-import { db } from "./database.js"
-import { get_now_timestamp, get_schedule, sleep, time_in_day, months, weekdays } from "./util.js"
+const moment = require("moment");
+const { db } = require("./database.js");
+const { get_now_timestamp, get_schedule, sleep, time_in_day, months, weekdays } = require("./util.js");
 
 const emoji_number= (number) => {
     if (number > 9 || number < 1) return number
@@ -34,7 +34,7 @@ const sort_tasks = (tasks) => {
 }
 
 
-export const string_for_day = (timestamp, tasks) => {
+const string_for_day = (timestamp, tasks) => {
     const date = moment.unix(Number(timestamp))
     const weekday = weekdays[date.day()]
     const monthday = date.date()
@@ -126,7 +126,7 @@ const spell_day = (amount) => {
     }
 }
 
-export const pretty_print_interval = async () => {
+const pretty_print_interval = async () => {
     const interval = await make_interval()
     let texts = []
 
@@ -147,7 +147,7 @@ export const pretty_print_interval = async () => {
 }
 
 
-export const make_day = async (timestamp) => {
+const make_day = async (timestamp) => {
     const tasks = await db.find({ is_removed: { $exists: false } }).toArray()
     const out = []
     for (let task of tasks) {
@@ -172,8 +172,15 @@ export const make_day = async (timestamp) => {
     return out
 }
 
-export const pretty_print_day = async (timestamp) => {
+const pretty_print_day = async (timestamp) => {
     const tasks = await make_day(timestamp)
 
     return string_for_day(timestamp, tasks)
 }
+
+module.exports = {
+    string_for_day,
+    pretty_print_interval,
+    make_day,
+    pretty_print_day
+};

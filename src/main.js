@@ -1,9 +1,9 @@
-import {Telegraf, Markup} from 'telegraf'
-import {message} from 'telegraf/filters'
-import dotenv from 'dotenv'
-import {sleep, get_schedule, get_now_timestamp, time_in_day} from './util.js';
-import {db} from './database.js';
-import {make_day, pretty_print_interval, pretty_print_day} from './tasks.js';
+const { Telegraf, Markup } = require('telegraf');
+const { message } = require('telegraf/filters');
+const dotenv = require('dotenv');
+const { sleep, get_schedule, get_now_timestamp, time_in_day } = require('./util.js');
+const { db } = require('./database.js');
+const { make_day, pretty_print_interval, pretty_print_day } = require('./tasks.js');
 
 
 dotenv.config()
@@ -195,8 +195,15 @@ bot.on(message('text'), async (ctx) => {
         // repeat
         // once
         const schedule = get_schedule(text)
-        const response = await db.insertOne(schedule)
-        last_inserted_id = response.insertedId
+        if (schedule) {
+            const response = await db.insertOne(schedule)
+            last_inserted_id = response.insertedId
+        } else {
+            await bot.telegram.sendMessage(ctx.chat.id, {
+                text: 'Неверный формат задания. Используйте /help для справки.',
+                parse_mode: 'markdown'
+            })
+        }
     } else if (text.startsWith('в ') || text.startsWith('v ')) {
         // check as done
         const checkmarks = text.replace('в ', '').replace('v ', '').split(' ').map(x => Number(x))
@@ -211,7 +218,7 @@ bot.on(message('text'), async (ctx) => {
             }
             const checkmark = await db.findOne(data)
             if (checkmark) {
-                await db.deleteOne(checkmark)
+                await db.deleteOne({_id: checkmark._id})
             } else {
                 await db.insertOne(data)
             }
@@ -226,17 +233,41 @@ bot.on(message('text'), async (ctx) => {
             await db.updateOne({_id: obj._id}, {$set: {is_removed: true}})
         }
     }
-    await send_today(ctx)
 
+    await send_today(ctx)
 })
 
 
-bot.catch(error => console.error(error))
 
-console.log('Starting bot');
-bot.launch()
+module.exports.handler = async function (event, context) {
+    console.log('GOT MESSAGE')
+    try {
 
-// Enable graceful stop
-process.once('SIGINT', () => bot.stop('SIGINT'))
-process.once('SIGTERM', () => bot.stop('SIGTERM'))
+        const message = JSON.parse(event['messages'][0]['details']['message']['body']);
+        await bot.handleUpdate(message);
+        console.log('HANDLE A')
+    } catch (e) {
+        const payload = event.messages[0]['details']['payload']
+        console.log('HANDLE B')
+        console.log(payload)
+        console.log(payload === 'notify')
+        if (payload === 'notify') {
+            console.log('make_day')
+            const tasks = await make_day(get_now_timestamp())
+            console.log(tasks)
+            if (tasks.length === 0) return
+            await send_today()
+        }
+    }
+    return {
+        statusCode: 500,
+        body: event.string,
+    };
+};
 
+
+if (process.env.MODE === 'dev') {
+    bot.launch()
+    process.once('SIGINT', () => bot.stop('SIGINT'))
+    process.once('SIGTERM', () => bot.stop('SIGTERM'))
+}

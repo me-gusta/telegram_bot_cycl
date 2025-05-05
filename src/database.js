@@ -1,13 +1,11 @@
-import Datastore from 'nedb';
-import path from 'path';
-import { fileURLToPath } from 'url';
+const Datastore = require('nedb');
+const path = require('path');
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dbPath = path.join(__dirname, '../data');
+const dbPath = proccess.env.MODE === 'dev' ? path.join(__dirname, '../data') :  path.join('/function/storage/data')
 
-export let db;
+let db;
 
-(async function () {
+(function () {
     // Create data directory if it doesn't exist
     try {
         // Ensure the data directory exists (NeDB will create it if needed)
@@ -44,8 +42,12 @@ export let db;
             
             insertOne: (doc) => {
                 return new Promise((resolve, reject) => {
+                    if (!doc) {
+                        return resolve({ insertedId: null });
+                    }
                     schedulesDb.insert(doc, (err, newDoc) => {
-                        if (err) reject(err);
+                        if (err) return reject(err);
+                        if (!newDoc) return resolve({ insertedId: null });
                         resolve({ insertedId: newDoc._id });
                     });
                 });
@@ -73,3 +75,5 @@ export let db;
         console.error('Error initializing database:', err);
     }
 })();
+
+module.exports = { db };
